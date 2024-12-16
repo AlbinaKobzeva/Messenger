@@ -1,21 +1,32 @@
-from flask import Flask, redirect, request, render_template, session, url_for, flash
+from flask import Flask, redirect, request, render_template, session, url_for, flash, current_app
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash, generate_password_hash
 import re
-
+import os
+import sqlite3
+from os import path
 app = Flask(__name__)
-app.secret_key = 'секретно-секретный секрет'
+
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'секретно-секретный секрет')
+app.config['DB_TYPE'] = os.getenv('DB_TYPE', 'postgres')
 
 # Подключение к базе данных
 def db_connect():
-    conn = psycopg2.connect(
-        host='127.0.0.1',
-        database='rgz',
-        user='albina',
-        password='12345'
-    )
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    if current_app.config['DB_TYPE'] == 'postgres':
+        conn = psycopg2.connect(
+            host='127.0.0.1',
+            database='rgz',
+            user='albina',
+            password='12345'
+        )
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+    else:
+        dir_path = path.dirname(path.realpath(__file__))
+        db_path = path.join(dir_path, "database.db")
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
     return conn, cur
 
 
@@ -74,13 +85,23 @@ def register():
         return render_template('register.html', error='Заполните все поля')
     
     conn, cur = db_connect()
-    cur.execute("SELECT login FROM users WHERE login=%s;", (login,))
+    
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("SELECT login FROM users WHERE login=%s;", (login,))
+    else:
+        cur.execute("SELECT login FROM users WHERE login=?;", (login,))
+
     if cur.fetchone():
         db_close(conn, cur)
         return render_template('register.html', error='Такой пользователь уже существует')
     
     password_hash = generate_password_hash(password)
-    cur.execute("INSERT INTO users (login, password, is_admin) VALUES (%s, %s, %s);", (login, password_hash, False))
+
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("INSERT INTO users (login, password, is_admin) VALUES (%s, %s, %s);", (login, password_hash, False))
+    else:
+        cur.execute("INSERT INTO users (login, password, is_admin) VALUES (?, ?, ?);", (login, password_hash, False))
+
     db_close(conn, cur)
     return render_template('success.html', login=login)
 
@@ -94,7 +115,6 @@ def login():
     login = request.form.get('login')
     password = request.form.get('password')
     
-    
     if not validate_login(login):
         return render_template('login.html', error='Логин должен состоять из латинских букв, цифр и знаков препинания')
     
@@ -106,7 +126,12 @@ def login():
         return render_template('login.html', error='Заполните все поля')
     
     conn, cur = db_connect()
-    cur.execute("SELECT * FROM users WHERE login=%s;", (login,))
+
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("SELECT * FROM users WHERE login=%s;", (login,))
+    else:
+        cur.execute("SELECT * FROM users WHERE login=?;", (login,))
+
     user = cur.fetchone()
     if not user or not check_password_hash(user['password'], password):
         db_close(conn, cur)
@@ -162,17 +187,23 @@ def send_message():
 
     sender_id = session['user_id']
     
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("SELECT id FROM users WHERE id = %s;", (receiver_id,))
+    else:
+        cur.execute("SELECT id FROM users WHERE id = ?;", (receiver_id,))
 
-    cur.execute("SELECT id FROM users WHERE id = %s;", (receiver_id,))
     receiver_exists = cur.fetchone()
     if not receiver_exists:
         db_close(conn, cur)
         flash('Получатель не существует', 'error')
         return redirect(url_for('select_chat'))
 
-    cur.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (%s, %s, %s);",
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (%s, %s, %s);",
                 (sender_id, receiver_id, content))
-    
+    else:
+        cur.execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?);",
+                (sender_id, receiver_id, content))
 
     conn.commit()
     
@@ -192,13 +223,23 @@ def messages():
     
     user_id = session['user_id']
     
-    cur.execute("""
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("""
         SELECT m.id, m.content, m.created_at, u.login AS sender_login, m.sender_id, m.receiver_id
         FROM messages m
         JOIN users u ON m.sender_id = u.id
         WHERE m.receiver_id = %s OR m.sender_id = %s
         ORDER BY m.created_at ASC;
-    """, (user_id, user_id))
+        """, (user_id, user_id))
+    else:
+        cur.execute("""
+        SELECT m.id, m.content, m.created_at, u.login AS sender_login, m.sender_id, m.receiver_id
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        WHERE m.receiver_id = ? OR m.sender_id = ?
+        ORDER BY m.created_at ASC;
+        """, (user_id, user_id))
+
     messages = cur.fetchall()
     db_close(conn, cur)
     
@@ -215,7 +256,11 @@ def select_chat():
     
     user_id = session['user_id']
     
-    cur.execute("SELECT id, login FROM users WHERE id != %s;", (user_id,))
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("SELECT id, login FROM users WHERE id != %s;", (user_id,))
+    else:
+        cur.execute("SELECT id, login FROM users WHERE id != ?;", (user_id,))
+
     users = cur.fetchall()
     db_close(conn, cur)
     
@@ -232,16 +277,29 @@ def chat(partner_id):
     
     user_id = session['user_id']
     
-    cur.execute("SELECT login FROM users WHERE id = %s;", (partner_id,))
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("SELECT login FROM users WHERE id = %s;", (partner_id,))
+    else:
+        cur.execute("SELECT login FROM users WHERE id = ?;", (partner_id,))
     partner_login = cur.fetchone()['login']
     
-    cur.execute("""
-        SELECT m.id, m.content, m.created_at, u.login AS sender_login, m.sender_id, m.receiver_id
-        FROM messages m
-        JOIN users u ON m.sender_id = u.id
-        WHERE (m.sender_id = %s AND m.receiver_id = %s) OR (m.sender_id = %s AND m.receiver_id = %s)
-        ORDER BY m.created_at ASC;
-    """, (user_id, partner_id, partner_id, user_id))
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("""
+            SELECT m.id, m.content, m.created_at, u.login AS sender_login, m.sender_id, m.receiver_id
+            FROM messages m
+            JOIN users u ON m.sender_id = u.id
+            WHERE (m.sender_id = %s AND m.receiver_id = %s) OR (m.sender_id = %s AND m.receiver_id = %s)
+            ORDER BY m.created_at ASC;
+        """, (user_id, partner_id, partner_id, user_id))
+    else:
+        cur.execute("""
+            SELECT m.id, m.content, m.created_at, u.login AS sender_login, m.sender_id, m.receiver_id
+            FROM messages m
+            JOIN users u ON m.sender_id = u.id
+            WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
+            ORDER BY m.created_at ASC;
+        """, (user_id, partner_id, partner_id, user_id))
+
     messages = cur.fetchall()
     db_close(conn, cur)
     
@@ -258,8 +316,11 @@ def delete_message(message_id):
     
     user_id = session['user_id']
     
-    cur.execute("DELETE FROM messages WHERE id = %s AND (sender_id = %s OR receiver_id = %s);",
-                (message_id, user_id, user_id))
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("DELETE FROM messages WHERE id = %s AND (sender_id = %s OR receiver_id = %s);",(message_id, user_id, user_id))
+    else:
+        cur.execute("DELETE FROM messages WHERE id = ? AND (sender_id = ? OR receiver_id = ?);",(message_id, user_id, user_id))
+
     db_close(conn, cur)
     
     flash('Сообщение удалено', 'success')
@@ -292,7 +353,74 @@ def delete_user(user_id):
         return redirect(url_for('main'))
     
     conn, cur = db_connect()
-    cur.execute("DELETE FROM users WHERE id = %s;", (user_id,))
+
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("DELETE FROM users WHERE id = %s;", (user_id,))
+    else:
+        cur.execute("DELETE FROM users WHERE id = ?;", (user_id,))
+    
     db_close(conn, cur)
     
+    return redirect(url_for('admin'))
+    if 'login' not in session or not session.get('is_admin'):
+        return redirect(url_for('main'))
+    
+    conn, cur = db_connect()
+    
+    if request.method == 'GET':
+
+        if current_app.config['DB_TYPE'] == 'postgres':
+            cur.execute("SELECT id, login, is_admin FROM users WHERE id = %s;", (user_id,))
+        else:
+            cur.execute("SELECT id, login, is_admin FROM users WHERE id = ?;", (user_id,))
+
+        user = cur.fetchone()
+        if not user:
+            db_close(conn, cur)
+            flash('Пользователь не найден', 'error')
+            return redirect(url_for('admin'))
+        
+        db_close(conn, cur)
+        return render_template('edit_user.html', user=user)
+    
+
+    login = request.form.get('login')
+    password = request.form.get('password')
+    is_admin = request.form.get('is_admin') == 'True'
+    
+    if not validate_login(login):
+        db_close(conn, cur)
+        flash('Логин должен состоять из латинских букв, цифр и знаков препинания', 'error')
+        return redirect(url_for('edit_user', user_id=user_id))
+    
+    if password:
+        if not validate_password(password):
+            db_close(conn, cur)
+            flash('Пароль должен состоять из латинских букв, цифр и знаков препинания', 'error')
+            return redirect(url_for('edit_user', user_id=user_id))
+        password_hash = generate_password_hash(password)
+    else:
+
+        if current_app.config['DB_TYPE'] == 'postgres':
+            cur.execute("SELECT password FROM users WHERE id = %s;", (user_id,))
+        else:
+            cur.execute("SELECT password FROM users WHERE id = ?;", (user_id,))
+        password_hash = cur.fetchone()['password']
+    
+    if current_app.config['DB_TYPE'] == 'postgres':
+        cur.execute("""
+            UPDATE users 
+            SET login = %s, password = %s, is_admin = %s 
+            WHERE id = %s;
+        """, (login, password_hash, is_admin, user_id))
+    else:
+        cur.execute("""
+            UPDATE users 
+            SET login = ?, password = ?, is_admin = ? 
+            WHERE id = ?;
+        """, (login, password_hash, is_admin, user_id))
+
+    db_close(conn, cur)
+    
+    flash('Пользователь успешно обновлён', 'success')
     return redirect(url_for('admin'))
