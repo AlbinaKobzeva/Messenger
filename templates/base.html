@@ -1,0 +1,32 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
+    <title>Мессенджер</title>
+    {% block script %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div style="float: right;">
+            {% if session.get('login') %}
+                <span>Привет, {{ session['login'] }}!</span>
+                <a href="{{ url_for('logout') }}" class="block">Выйти</a>
+            {% else %}
+                <span>Аноним</span>
+                <a href="{{ url_for('login') }}" class="block">Войти</a>
+                <a href="{{ url_for('register') }}" class="block">Зарегистрироваться</a>
+            {% endif %}
+        </div>
+    </header>
+    <main>
+        {% block main %}{% endblock %}
+    </main>
+    <footer>
+        &copy; Кобзева Альбина Алексеевна, 3 курс, группа ФБИ-24
+    </footer>
+</body>
+</html>

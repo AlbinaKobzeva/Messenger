@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block main %}
+    <h1>Выберите пользователя для просмотра переписки</h1>
+    <ul>
+        {% for user in users %}
+            <li>
+                <a href="{{ url_for('chat', partner_id=user['id']) }}">{{ user['login'] }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+    
+    <!-- Кнопка для администратора -->
+    {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin') }}">Административная панель</a>
+    {% endif %}
+    
+{% endblock %}

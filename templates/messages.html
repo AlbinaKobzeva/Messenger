@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block main %}
+    <h1>Ваши сообщения</h1>
+    <div class="messages-container">
+        {% for message in messages %}
+            <div class="message {% if message['sender_id'] == user_id %}outgoing{% else %}incoming{% endif %}">
+                <p>
+                    <strong>
+                        {% if message['sender_id'] == user_id %}
+                            Вы:
+                        {% else %}
+                            {{ message['sender_login'] }}:
+                        {% endif %}
+                    </strong>
+                    {{ message['content'] }}
+                </p>
+                <p class="message-time"><small>{{ message['created_at'] }}</small></p>
+                {% if message['sender_id'] == user_id or message['receiver_id'] == user_id %}
+                    <form action="{{ url_for('delete_message', message_id=message['id']) }}" method="POST" style="display:inline;">
+                        <button type="submit">Удалить</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

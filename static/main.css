@@ -1,0 +1,127 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f6f0;
+}
+
+header {
+    background-color: #8B7355;
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header a {
+    color: white;
+    text-decoration: none;
+    margin-left: 10px;
+}
+
+header a:hover {
+    text-decoration: underline;
+}
+
+main {
+    padding: 20px;
+}
+
+footer {
+    background-color: #6F4E37;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+    width: 100%;
+}
+
+/* Стили для форм */
+form {
+    margin-bottom: 20px;
+}
+
+form div {
+    margin-bottom: 10px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    color: #6F4E37;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #D2B48C;
+    border-radius: 4px;
+    background-color: #f9f6f0;
+}
+
+button {
+    background-color: #8B7355;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #6F4E37;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+li {
+    background-color: #f9f6f0;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #D2B48C;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+li form {
+    display: inline;
+}
+
+li button {
+    background-color: #A0522D;
+}
+
+li button:hover {
+    background-color: #8B4513; 
+}
+
+.message {
+    background-color: #F5DEB3;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.message strong {
+    color: #6F4E37;
+}
+
+.message form {
+    display: inline;
+}
+
+a{
+    text-decoration: none;
+    color: #6F4E37;
+    font-size: 13pt;
+}
+a:hover{
+    color: #3b2210;
+}
