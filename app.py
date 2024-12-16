@@ -2,6 +2,7 @@ from flask import Flask, redirect, request, render_template, session, url_for, f
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash, generate_password_hash
+import re
 
 app = Flask(__name__)
 app.secret_key = 'секретно-секретный секрет'
@@ -39,6 +40,20 @@ def main():
     return render_template('main.html', users=users)
 
 
+def validate_login(login):
+    if not login:
+        return False
+    # Логин должен состоять только из латинских букв, цифр и знаков препинания
+    return re.match(r'^[A-Za-z0-9_.-]+$', login) is not None
+
+# Функция для валидации пароля
+def validate_password(password):
+    if not password:
+        return False
+    # Пароль должен состоять только из латинских букв, цифр и знаков препинания
+    return re.match(r'^[A-Za-z0-9_.-]+$', password) is not None
+
+
 # Регистрация пользователя
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -47,6 +62,14 @@ def register():
     
     login = request.form.get('login')
     password = request.form.get('password')
+    
+    if not validate_login(login):
+        return render_template('register.html', error='Логин должен состоять из латинских букв, цифр и знаков препинания')
+    
+    if not validate_password(password):
+        return render_template('register.html', error='Пароль должен состоять из латинских букв, цифр и знаков препинания')
+
+
     if not (login and password):
         return render_template('register.html', error='Заполните все поля')
     
@@ -70,6 +93,15 @@ def login():
     
     login = request.form.get('login')
     password = request.form.get('password')
+    
+    
+    if not validate_login(login):
+        return render_template('login.html', error='Логин должен состоять из латинских букв, цифр и знаков препинания')
+    
+    if not validate_password(password):
+        return render_template('login.html', error='Пароль должен состоять из латинских букв, цифр и знаков препинания')
+
+
     if not (login and password):
         return render_template('login.html', error='Заполните все поля')
     
